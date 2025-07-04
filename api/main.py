@@ -2,10 +2,13 @@ import uvicorn
 import os
 import sys
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file in the project root
+project_root = Path(__file__).parent.parent
+env_path = project_root / '.env'
+load_dotenv(env_path)
 
 from api.logging_config import setup_logging
 
