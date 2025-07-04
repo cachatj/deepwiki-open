@@ -875,6 +875,7 @@ IMPORTANT:
         }
       }
 
+      // Check for specific error patterns in the response
       if(responseText.includes('Error preparing retriever: Environment variable OPENAI_API_KEY must be set')) {
          setEmbeddingError(true);
          throw new Error('OPENAI_API_KEY environment variable is not set. Please configure your OpenAI API key.');
@@ -885,13 +886,51 @@ IMPORTANT:
          throw new Error('The specified Ollama embedding model was not found. Please ensure the model is installed locally or select a different embedding model in the configuration.');
        }
 
-        // Clean up markdown delimiters
-      responseText = responseText.replace(/^```(?:xml)?\s*/i, '').replace(/```\s*$/i, '');
+       // Check if the response looks like an error message instead of XML
+       if (responseText.includes('Error:') || responseText.includes('error:') || responseText.includes('Exception:')) {
+         console.error('AI model returned an error response:', responseText);
+         throw new Error('The AI model encountered an error while generating the wiki structure. Please try again with different settings or check your model configuration.');
+       }
 
-      // Extract wiki structure from response
-      const xmlMatch = responseText.match(/<wiki_structure>[\s\S]*?<\/wiki_structure>/m);
+       // Check if the response is too short to contain valid XML
+       if (responseText.length < 50) {
+         console.error('Response too short:', responseText);
+         throw new Error('The AI model returned an incomplete response. Please try again.');
+       }
+
+        // Clean up markdown delimiters and other formatting
+      responseText = responseText.replace(/^```(?:xml)?\s*/i, '').replace(/```\s*$/i, '');
+      
+      // Remove any leading/trailing whitespace and newlines
+      responseText = responseText.trim();
+      
+      // Try to find XML structure with more flexible matching
+      let xmlMatch = responseText.match(/<wiki_structure>[\s\S]*?<\/wiki_structure>/m);
+      
+      // If no match found, try alternative approaches
       if (!xmlMatch) {
-        throw new Error('No valid XML found in response');
+        // Try to find XML without the outer tags (in case they're missing)
+        const titleMatch = responseText.match(/<title>[\s\S]*?<\/title>/m);
+        const pagesMatch = responseText.match(/<pages>[\s\S]*?<\/pages>/m);
+        
+        if (titleMatch && pagesMatch) {
+          // Reconstruct the XML structure
+          const reconstructedXml = `<wiki_structure>\n${responseText}\n</wiki_structure>`;
+          xmlMatch = [reconstructedXml];
+          console.log('Reconstructed XML structure from partial response');
+        } else {
+          // Log the response for debugging
+          console.error('Raw response text:', responseText.substring(0, 500) + '...');
+          console.error('Response length:', responseText.length);
+          
+          // Try to extract any XML-like content
+          const anyXmlMatch = responseText.match(/<[^>]+>[\s\S]*?<\/[^>]+>/m);
+          if (anyXmlMatch) {
+            console.error('Found some XML content but not wiki_structure:', anyXmlMatch[0].substring(0, 200));
+          }
+          
+          throw new Error('No valid XML found in response. The AI model may have returned an unexpected format. Please try again or check your model configuration.');
+        }
       }
 
       let xmlText = xmlMatch[0];
