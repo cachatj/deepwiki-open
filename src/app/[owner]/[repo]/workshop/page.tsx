@@ -301,7 +301,11 @@ Make the workshop content in ${language === 'en' ? 'English' :
   language === 'zh-tw' ? 'Traditional Chinese (繁體中文)' :
   language === 'es' ? 'Spanish (Español)' :
   language === 'kr' ? 'Korean (한국어)' :
-  language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 'English'} language.`
+  language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 
+  language === "pt-br" ? "Brazilian Portuguese (Português Brasileiro)" :
+  language === "fr" ? "Français (French)" :
+  language === "ru" ? "Русский (Russian)" :
+  'English'} language.`
         }]
       };
 
@@ -314,7 +318,7 @@ Make the workshop content in ${language === 'en' ? 'English' :
       try {
         // Create WebSocket URL from the server base URL
         const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:8001';
-        const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws');
+        const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws')? serverBaseUrl.replace(/^https/, 'wss'): serverBaseUrl.replace(/^http/, 'ws');
         const wsUrl = `${wsBaseUrl}/ws/chat`;
 
         // Create a new WebSocket connection

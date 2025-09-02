@@ -14,7 +14,7 @@
 [![Twitter/X](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/sashimikun_void)
 [![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/VQMBGR8u5v)
 
-[English](./README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-tw.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md)
+[English](./README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-tw.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md) | [Français](./README.fr.md) | [Русский](./README.ru.md)
 
 ## ✨ Features
 
@@ -186,8 +186,8 @@ DeepWiki now implements a flexible provider-based model selection system support
 
 ### Supported Providers and Models
 
-- **Google**: Default `gemini-2.0-flash`, also supports `gemini-1.5-flash`, `gemini-1.0-pro`, etc.
-- **OpenAI**: Default `gpt-4o`, also supports `o4-mini`, etc.
+- **Google**: Default `gemini-2.5-flash`, also supports `gemini-2.5-flash-lite`, `gemini-2.5-pro`, etc.
+- **OpenAI**: Default `gpt-5-nano`, also supports `gpt-5`, `4o`, etc.
 - **OpenRouter**: Access to multiple models via a unified API, including Claude, Llama, Mistral, etc.
 - **Azure OpenAI**: Default `gpt-4o`, also supports `o4-mini`, etc.
 - **Ollama**: Support for locally running open-source models like `llama3`

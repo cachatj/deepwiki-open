@@ -14,7 +14,7 @@
 [![Twitter/X](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/sashimikun_void)
 [![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/VQMBGR8u5v)
 
-[English](./README.md) | [简体中文](./README.zh.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md)
+[English](./README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-tw.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md) | [Français](./README.fr.md) | [Русский](./README.ru.md)
 
 ## ✨ 特徴
 
@@ -299,8 +299,8 @@ DeepWikiでは、複数のLLMプロバイダーをサポートする柔軟なプ
 
 ### サポートされているプロバイダーとモデル
 
-- **Google**: デフォルトは `gemini-2.0-flash`、また `gemini-1.5-flash`、`gemini-1.0-pro` などもサポート
-- **OpenAI**: デフォルトは `gpt-4o`、また `o4-mini` などもサポート
+- **Google**: デフォルトは `gemini-2.5-flash`、また `gemini-2.5-flash-lite`、`gemini-2.5-pro` などもサポート
+- **OpenAI**: デフォルトは `gpt-5-nano`、また `gpt-5`、 `4o` などもサポート
 - **OpenRouter**: Claude、Llama、Mistralなど、統一APIを通じて複数のモデルにアクセス
 - **Ollama**: `llama3` などのローカルで実行するオープンソースモデルをサポート
 

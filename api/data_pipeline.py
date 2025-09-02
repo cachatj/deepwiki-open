@@ -99,15 +99,16 @@ def download_repo(repo_url: str, local_path: str, type: str = "github", access_t
                 # Format: https://oauth2:{token}@gitlab.com/owner/repo.git
                 clone_url = urlunparse((parsed.scheme, f"oauth2:{access_token}@{parsed.netloc}", parsed.path, '', '', ''))
             elif type == "bitbucket":
-                # Format: https://{token}@bitbucket.org/owner/repo.git
-                clone_url = urlunparse((parsed.scheme, f"{access_token}@{parsed.netloc}", parsed.path, '', '', ''))
+                # Format: https://x-token-auth:{token}@bitbucket.org/owner/repo.git
+                clone_url = urlunparse((parsed.scheme, f"x-token-auth:{access_token}@{parsed.netloc}", parsed.path, '', '', ''))
+
             logger.info("Using access token for authentication")
 
         # Clone the repository
         logger.info(f"Cloning repository from {repo_url} to {local_path}")
         # We use repo_url in the log to avoid exposing the token in logs
         result = subprocess.run(
-            ["git", "clone", clone_url, local_path],
+            ["git", "clone", "--depth=1", "--single-branch", clone_url, local_path],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

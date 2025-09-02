@@ -14,7 +14,7 @@
 [![Twitter/X](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/sashimikun_void)
 [![Discord](https://img.shields.io/badge/Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/VQMBGR8u5v)
 
-[English](./README.md) | [简体中文](./README.zh.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md)
+[English](./README.md) | [简体中文](./README.zh.md) | [繁體中文](./README.zh-tw.md) | [日本語](./README.ja.md) | [Español](./README.es.md) | [한국어](./README.kr.md) | [Tiếng Việt](./README.vi.md) | [Português Brasileiro](./README.pt-br.md) | [Français](./README.fr.md) | [Русский](./README.ru.md)
 
 ## ✨ Tính năng
 
@@ -251,8 +251,8 @@ DeepWiki hiện đã triển khai một hệ thống lựa chọn mô hình linh
 
 ### Các nhà cung cấp và mô hình được hỗ trợ
 
-- **Google**: Mặc định là `gemini-2.0-flash`, cũng hỗ trợ `gemini-1.5-flash`, `gemini-1.0-pro`, v.v.
-- **OpenAI**: Mặc định là `gpt-4o`, cũng hỗ trợ `o4-mini`, v.v.
+- **Google**: Mặc định là `gemini-2.5-flash`, cũng hỗ trợ `gemini-2.5-flash-lite`, `gemini-2.5-pro`, v.v.
+- **OpenAI**: Mặc định là `gpt-5-nano`, cũng hỗ trợ `gpt-5`, `4o`, v.v.
 - **OpenRouter**: Truy cập nhiều mô hình qua một API thống nhất, bao gồm Claude, Llama, Mistral, v.v.
 - **Ollama**: Hỗ trợ các mô hình mã nguồn mở chạy cục bộ như `llama3`
 

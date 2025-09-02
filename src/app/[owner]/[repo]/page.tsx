@@ -1,19 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
-import React, { useCallback, useState, useMemo, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
-import { FaExclamationTriangle, FaBookOpen, FaGithub, FaGitlab, FaBitbucket, FaDownload, FaFileExport, FaHome, FaFolder, FaSync, FaChevronUp, FaChevronDown, FaComments, FaTimes } from 'react-icons/fa';
-import Link from 'next/link';
-import ThemeToggle from '@/components/theme-toggle';
-import Markdown from '@/components/Markdown';
 import Ask from '@/components/Ask';
+import Markdown from '@/components/Markdown';
 import ModelSelectionModal from '@/components/ModelSelectionModal';
+import ThemeToggle from '@/components/theme-toggle';
 import WikiTreeView from '@/components/WikiTreeView';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { RepoInfo } from '@/types/repoinfo';
-import { extractUrlDomain, extractUrlPath } from '@/utils/urlDecoder';
 import getRepoUrl from '@/utils/getRepoUrl';
+import { extractUrlDomain, extractUrlPath } from '@/utils/urlDecoder';
+import Link from 'next/link';
+import { useParams, useSearchParams } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FaBitbucket, FaBookOpen, FaComments, FaDownload, FaExclamationTriangle, FaFileExport, FaFolder, FaGithub, FaGitlab, FaHome, FaSync, FaTimes } from 'react-icons/fa';
 // Define the WikiSection and WikiStructure types directly in this file
 // since the imported types don't have the sections and rootSections properties
 interface WikiSection {
@@ -105,6 +105,8 @@ const addTokensToRequestBody = (
   language: string = 'en',
   excludedDirs?: string,
   excludedFiles?: string,
+  includedDirs?: string,
+  includedFiles?: string
 ): void => {
   if (token !== '') {
     requestBody.token = token;
@@ -126,6 +128,13 @@ const addTokensToRequestBody = (
   if (excludedFiles) {
     requestBody.excluded_files = excludedFiles;
   }
+  if (includedDirs) {
+    requestBody.included_dirs = includedDirs;
+  }
+  if (includedFiles) {
+    requestBody.included_files = includedFiles;
+  }
+
 };
 
 const createGithubHeaders = (githubToken: string): HeadersInit => {
@@ -176,7 +185,6 @@ export default function RepoWikiPage() {
 
   // Extract tokens from search params
   const token = searchParams.get('token') || '';
-  const repoType = searchParams.get('type') || 'github';
   const localPath = searchParams.get('local_path') ? decodeURIComponent(searchParams.get('local_path') || '') : undefined;
   const repoUrl = searchParams.get('repo_url') ? decodeURIComponent(searchParams.get('repo_url') || '') : undefined;
   const providerParam = searchParams.get('provider') || '';
@@ -184,6 +192,13 @@ export default function RepoWikiPage() {
   const isCustomModelParam = searchParams.get('is_custom_model') === 'true';
   const customModelParam = searchParams.get('custom_model') || '';
   const language = searchParams.get('language') || 'en';
+  const repoType = repoUrl?.includes('bitbucket.org')
+    ? 'bitbucket'
+    : repoUrl?.includes('gitlab.com')
+      ? 'gitlab'
+      : repoUrl?.includes('github.com')
+        ? 'github'
+        : searchParams.get('type') || 'github';
 
   // Import language context for translations
   const { messages } = useLanguage();
@@ -226,6 +241,11 @@ export default function RepoWikiPage() {
   const excludedFiles = searchParams.get('excluded_files') || '';
   const [modelExcludedDirs, setModelExcludedDirs] = useState(excludedDirs);
   const [modelExcludedFiles, setModelExcludedFiles] = useState(excludedFiles);
+  const includedDirs = searchParams.get('included_dirs') || '';
+  const includedFiles = searchParams.get('included_files') || '';
+  const [modelIncludedDirs, setModelIncludedDirs] = useState(includedDirs);
+  const [modelIncludedFiles, setModelIncludedFiles] = useState(includedFiles);
+
 
   // Wiki type state - default to comprehensive view
   const isComprehensiveParam = searchParams.get('comprehensive') !== 'false';
@@ -467,7 +487,11 @@ IMPORTANT: Generate the content in ${language === 'en' ? 'English' :
             language === 'zh-tw' ? 'Traditional Chinese (繁體中文)' :
             language === 'es' ? 'Spanish (Español)' :
             language === 'kr' ? 'Korean (한국어)' :
-            language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 'English'} language.
+            language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 
+            language === "pt-br" ? "Brazilian Portuguese (Português Brasileiro)" :
+            language === "fr" ? "Français (French)" :
+            language === "ru" ? "Русский (Russian)" :
+            'English'} language.
 
 Remember:
 - Ground every claim in the provided source files.
@@ -487,7 +511,7 @@ Remember:
         };
 
         // Add tokens if available
-        addTokensToRequestBody(requestBody, currentToken, effectiveRepoInfo.type, selectedProviderState, selectedModelState, isCustomSelectedModelState, customSelectedModelState, language, modelExcludedDirs, modelExcludedFiles);
+        addTokensToRequestBody(requestBody, currentToken, effectiveRepoInfo.type, selectedProviderState, selectedModelState, isCustomSelectedModelState, customSelectedModelState, language, modelExcludedDirs, modelExcludedFiles, modelIncludedDirs, modelIncludedFiles);
 
         // Use WebSocket for communication
         let content = '';
@@ -495,7 +519,7 @@ Remember:
         try {
           // Create WebSocket URL from the server base URL
           const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:8001';
-          const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws');
+          const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws')? serverBaseUrl.replace(/^https/, 'wss'): serverBaseUrl.replace(/^http/, 'ws');
           const wsUrl = `${wsBaseUrl}/ws/chat`;
 
           // Create a new WebSocket connection
@@ -679,7 +703,11 @@ IMPORTANT: The wiki content will be generated in ${language === 'en' ? 'English'
             language === 'zh-tw' ? 'Traditional Chinese (繁體中文)' :
             language === 'es' ? 'Spanish (Español)' :
             language === 'kr' ? 'Korean (한国語)' :
-            language === 'vi' ? 'Vietnamese (Tiếng Việt)' : 'English'} language.
+            language === 'vi' ? 'Vietnamese (Tiếng Việt)' :
+            language === "pt-br" ? "Brazilian Portuguese (Português Brasileiro)" :
+            language === "fr" ? "Français (French)" :
+            language === "ru" ? "Русский (Russian)" :
+            'English'} language.
 
 When designing the wiki structure, include pages that would benefit from visual diagrams, such as:
 - Architecture overviews
@@ -780,7 +808,7 @@ IMPORTANT:
       };
 
       // Add tokens if available
-      addTokensToRequestBody(requestBody, currentToken, effectiveRepoInfo.type, selectedProviderState, selectedModelState, isCustomSelectedModelState, customSelectedModelState, language, modelExcludedDirs, modelExcludedFiles);
+      addTokensToRequestBody(requestBody, currentToken, effectiveRepoInfo.type, selectedProviderState, selectedModelState, isCustomSelectedModelState, customSelectedModelState, language, modelExcludedDirs, modelExcludedFiles, modelIncludedDirs, modelIncludedFiles);
 
       // Use WebSocket for communication
       let responseText = '';
@@ -788,7 +816,7 @@ IMPORTANT:
       try {
         // Create WebSocket URL from the server base URL
         const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:8001';
-        const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws');
+        const wsBaseUrl = serverBaseUrl.replace(/^http/, 'ws')? serverBaseUrl.replace(/^https/, 'wss'): serverBaseUrl.replace(/^http/, 'ws');
         const wsUrl = `${wsBaseUrl}/ws/chat`;
 
         // Create a new WebSocket connection
@@ -1222,7 +1250,6 @@ IMPORTANT:
         };
 
         const githubApiBaseUrl = getGithubApiUrl(effectiveRepoInfo.repoUrl);
-
         // First, try to get the default branch from the repository info
         let defaultBranchLocal = null;
         try {
@@ -2248,6 +2275,10 @@ IMPORTANT:
         setExcludedDirs={setModelExcludedDirs}
         excludedFiles={modelExcludedFiles}
         setExcludedFiles={setModelExcludedFiles}
+        includedDirs={modelIncludedDirs}
+        setIncludedDirs={setModelIncludedDirs}
+        includedFiles={modelIncludedFiles}
+        setIncludedFiles={setModelIncludedFiles}
         onApply={confirmRefresh}
         showWikiType={true}
         showTokenInput={effectiveRepoInfo.type !== 'local' && !currentToken} // Show token input if not local and no current token
