@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${PORT:-8001}:${PORT:-8001}" # API port
-      - "3000:3000" # Next.js port
+      - "${PORT:-8001}:${PORT:-8001}"  # API port
+      - "3000:3000"  # Next.js port
     env_file:
       - .env
     environment:
@@ -17,16 +17,14 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FILE_PATH=${LOG_FILE_PATH:-api/logs/application.log}
     volumes:
-      - ~/.adalflow:/root/.adalflow # Persist repository and embedding data
-      - ./api/logs:/app/api/logs # Persist log files across container restarts
-      - /Users/jcachat/code_sandbox:/Users/jcachat/code_sandbox:ro # Mount local code sandbox for cloning repos
-      - /Users/jcachat/code_sandbox/edna_phm_sow_airflow_antigravity:/sow:ro
+      - ~/.adalflow:/root/.adalflow      # Persist repository and embedding data
+      - ./api/logs:/app/api/logs          # Persist log files across container restarts
     # Resource limits for docker-compose up (not Swarm mode)
     mem_limit: 6g
     mem_reservation: 2g
     # Health check configuration
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${PORT:-8001}/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8001}/health"]
       interval: 60s
       timeout: 10s
       retries: 3

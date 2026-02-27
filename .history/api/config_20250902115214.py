@@ -12,8 +12,7 @@ from api.openrouter_client import OpenRouterClient
 from api.bedrock_client import BedrockClient
 from api.azureai_client import AzureAIClient
 from api.dashscope_client import DashscopeClient
-from adalflow import OllamaClient
-from api.google_client import GoogleGenAIClient
+from adalflow import GoogleGenAIClient, OllamaClient
 
 # Get API keys from environment variables
 OPENAI_API_KEY = os.environ.get('OPENAI_KEY')  # Changed from OPENAI_API_KEY to OPENAI_KEY

@@ -5,7 +5,7 @@
       "api_key": "${GOOGLE_API_KEY}"
     },
     "model_kwargs": {
-      "model": "models/gemini-embedding-001"
+      "model": "models/text-embedding-004"
     },
     "batch_size": 10
   },
