@@ -10,7 +10,7 @@ from starlette.responses import StreamingResponse
 import google.generativeai as genai
 
 from api.rag import RAG
-from api.data_pipeline import count_tokens, get_file_content, get_local_repo_structure
+from api.data_pipeline import count_tokens, get_file_content, get_local_repo_structure, is_local_path, normalize_local_path, get_local_directory_structure, get_local_file_content
 
 # Configure logging
 logging.basicConfig(
@@ -152,9 +152,12 @@ async def chat_completions_stream(request: ChatCompletionRequest):
         repo_name = repo_url.split("/")[-1] if "/" in repo_url else repo_url
 
         # Determine repository type
-        repo_type = "GitHub"
-        if "gitlab.com" in repo_url:
+        if is_local_path(repo_url):
+            repo_type = "Local"
+        elif "gitlab.com" in repo_url:
             repo_type = "GitLab"
+        else:
+            repo_type = "GitHub"
 
         system_prompt = f"""<role>
 You are an expert code analyst examining the {repo_type} repository: {repo_url} ({repo_name}).
@@ -328,8 +331,37 @@ async def get_repository_structure(request: RepoStructureRequest):
     Get the file structure of a repository.
     This endpoint will first try to use the GitHub/GitLab API, and if that fails,
     it will fall back to using the local filesystem.
+    Supports local filesystem paths (e.g., /cah-sow) for mounted volumes.
     """
     try:
+        repo_url = request.repo_url
+
+        # --- Handle local filesystem paths ---
+        if is_local_path(repo_url):
+            logger.info(f"Detected local path: {repo_url}")
+            try:
+                local_path = normalize_local_path(repo_url)
+                file_tree_data = get_local_directory_structure(local_path)
+
+                # Also try to read README content for local repos
+                readme_content = ""
+                for readme_name in ["README.md", "readme.md", "README.rst", "README.txt", "README"]:
+                    readme_path = os.path.join(local_path, readme_name)
+                    if os.path.isfile(readme_path):
+                        try:
+                            with open(readme_path, "r", encoding="utf-8") as f:
+                                readme_content = f.read()
+                            break
+                        except Exception:
+                            pass
+
+                return {"file_tree": file_tree_data, "readme": readme_content, "type": "local"}
+            except Exception as e:
+                error_msg = f"Error reading local directory: {str(e)}"
+                logger.error(error_msg)
+                raise HTTPException(status_code=500, detail=error_msg)
+
+        # --- Handle remote repositories (GitHub/GitLab) ---
         # Determine which access token to use based on the repository URL
         access_token = None
         if "github.com" in request.repo_url and request.github_token:
@@ -340,7 +372,6 @@ async def get_repository_structure(request: RepoStructureRequest):
             logger.info("Using GitLab token for authentication")
 
         # Parse repository URL to extract owner and repo
-        repo_url = request.repo_url
         repo_type = "github"  # Default to GitHub
         owner = ""
         repo = ""

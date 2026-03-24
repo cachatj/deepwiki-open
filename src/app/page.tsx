@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState, useMemo } from 'react';
-import { FaExclamationTriangle, FaBookOpen, FaWikipediaW, FaGithub, FaGitlab } from 'react-icons/fa';
+import { FaExclamationTriangle, FaBookOpen, FaWikipediaW, FaGithub, FaGitlab, FaFolder } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -122,11 +122,21 @@ If this is a sequence diagram, ensure proper syntax with "sequenceDiagram" direc
 
     try {
       setLoadingMessage('Attempting to auto-correct diagram error...');
+      // Determine the repo URL for the mermaid retry
+      let mermaidRepoUrl: string;
+      if (currentRepoInfo.type === 'local') {
+        mermaidRepoUrl = repositoryInput.trim();
+      } else if (currentRepoInfo.type === 'github') {
+        mermaidRepoUrl = `https://github.com/${owner}/${repo}`;
+      } else {
+        mermaidRepoUrl = `https://gitlab.com/${owner}/${repo}`;
+      }
+
       const response = await fetch('http://localhost:8001/chat/completions/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repo_url: `https://github.com/${owner}/${repo}`,
+          repo_url: mermaidRepoUrl,
           messages: [{ role: 'user', content: retryPrompt }]
         }),
       });
@@ -190,11 +200,28 @@ If this is a sequence diagram, ensure proper syntax with "sequenceDiagram" direc
     }
   }, [currentPageId, originalMarkdown, currentRepoInfo]);
 
+  // Detect if input looks like a local filesystem path
+  const isLocalPath = (input: string): boolean => {
+    const trimmed = input.trim();
+    return trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../') || trimmed.startsWith('~');
+  };
+
   // Parse repository URL/input and extract owner and repo
   const parseRepositoryInput = (input: string): { owner: string, repo: string, type: string, fullPath?: string } | null => {
     input = input.trim();
 
     let owner = '', repo = '', type = 'github', fullPath;
+
+    // Handle local filesystem paths (e.g., /cah-sow, ~/code/myrepo, ./local-repo)
+    if (isLocalPath(input)) {
+      type = 'local';
+      // For local paths, use the last directory name as the "repo" and "local" as the "owner"
+      const pathParts = input.replace(/\/+$/, '').split('/');
+      repo = pathParts[pathParts.length - 1] || input;
+      owner = 'local';
+      fullPath = input;
+      return { owner, repo, type, fullPath };
+    }
 
     // Handle GitHub URL format
     if (input.startsWith('https://github.com/')) {
@@ -272,13 +299,20 @@ If this is a sequence diagram, ensure proper syntax with "sequenceDiagram" direc
         // Make API call to generate page content
         console.log(`Starting content generation for page: ${page.title}`);
 
-        // Determine which token to use based on the repository type
-        const repoUrl = repoInfo.type === 'github'
-          ? `https://github.com/${owner}/${repo}`
-          : `https://gitlab.com/${owner}/${repo}`;
+        // Determine the repo URL based on the repository type
+        let repoUrl: string;
+        if (repoInfo.type === 'local') {
+          // For local repos, use the original input path stored in fullPath or reconstruct from repositoryInput
+          repoUrl = repositoryInput.trim();
+        } else if (repoInfo.type === 'github') {
+          repoUrl = `https://github.com/${owner}/${repo}`;
+        } else {
+          repoUrl = `https://gitlab.com/${owner}/${repo}`;
+        }
 
         // Create the prompt content
-        const promptContent = `Generate comprehensive wiki page content for "${page.title}" in the repository ${owner}/${repo}.
+        const repoDisplayName = repoInfo.type === 'local' ? repo : `${owner}/${repo}`;
+        const promptContent = `Generate comprehensive wiki page content for "${page.title}" in the repository ${repoDisplayName}.
 
 This page should focus on the following files:
 ${filePaths.map(path => `- ${path}`).join('\n')}
@@ -418,10 +452,18 @@ MERMAID DIAGRAM INSTRUCTIONS:
     try {
       setLoadingMessage('Determining wiki structure...');
 
-      // Determine which token to use based on the repository type
-      const repoUrl = repoInfo.type === 'github'
-        ? `https://github.com/${owner}/${repo}`
-        : `https://gitlab.com/${owner}/${repo}`;
+      // Determine the repo URL based on the repository type
+      let repoUrl: string;
+      if (repoInfo.type === 'local') {
+        repoUrl = repositoryInput.trim();
+      } else if (repoInfo.type === 'github') {
+        repoUrl = `https://github.com/${owner}/${repo}`;
+      } else {
+        repoUrl = `https://gitlab.com/${owner}/${repo}`;
+      }
+
+      const repoDisplayName = repoInfo.type === 'local' ? repo : `${owner}/${repo}`;
+      const repoTypeLabel = repoInfo.type === 'local' ? 'local' : (repoInfo.type === 'github' ? 'GitHub' : 'GitLab');
 
       // Prepare request body
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -429,7 +471,7 @@ MERMAID DIAGRAM INSTRUCTIONS:
         repo_url: repoUrl,
         messages: [{
             role: 'user',
-            content: `Analyze this GitHub repository ${owner}/${repo} and create a wiki structure for it.
+            content: `Analyze this ${repoTypeLabel} repository ${repoDisplayName} and create a wiki structure for it.
 
 1. The complete file tree of the project:
 <file_tree>
@@ -683,7 +725,7 @@ IMPORTANT:
     const parsedRepo = parseRepositoryInput(repositoryInput);
 
     if (!parsedRepo) {
-      setError('Invalid repository format. Use "owner/repo", "https://github.com/owner/repo", or "https://gitlab.com/owner/repo" format.');
+      setError('Invalid repository format. Use "owner/repo", "https://github.com/owner/repo", "https://gitlab.com/owner/repo", or a local path like "/cah-sow".');
       return;
     }
 
@@ -699,6 +741,46 @@ IMPORTANT:
       let readmeContent = '';
       let useBackendApi = false;
 
+      // --- Handle local filesystem paths ---
+      if (type === 'local') {
+        console.log(`Fetching local repository structure for: ${fullPath}`);
+        setLoadingMessage('Reading local repository structure...');
+
+        try {
+          const requestBody = {
+            repo_url: fullPath || repositoryInput.trim()
+          };
+
+          const response = await fetch('http://localhost:8001/repo/structure', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => 'No error details available');
+            throw new Error(`Backend API error (${response.status}): ${errorText}`);
+          }
+
+          const data = await response.json();
+          fileTreeData = data.file_tree;
+          readmeContent = data.readme || '';
+
+          console.log('Successfully fetched local repository structure');
+        } catch (error) {
+          const localError = error as Error;
+          console.error('Error fetching local repository structure:', localError);
+          throw new Error(`Could not read local repository: ${localError.message || String(localError)}`);
+        }
+
+        // Now determine the wiki structure for local repo
+        await determineWikiStructure(fileTreeData, readmeContent, owner, repo);
+        return;
+      }
+
+      // --- Handle remote repositories (GitHub/GitLab) ---
       // First try the direct GitHub/GitLab API approach
       try {
         if (type === 'github') {
@@ -1041,13 +1123,13 @@ IMPORTANT:
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  {repositoryInput.includes('gitlab.com') ? <FaGitlab className="text-gray-400" /> : <FaGithub className="text-gray-400" />}
+                  {isLocalPath(repositoryInput) ? <FaFolder className="text-gray-400" /> : repositoryInput.includes('gitlab.com') ? <FaGitlab className="text-gray-400" /> : <FaGithub className="text-gray-400" />}
                 </div>
                 <input
                   type="text"
                   value={repositoryInput}
                   onChange={(e) => setRepositoryInput(e.target.value)}
-                  placeholder="owner/repo or GitHub/GitLab URL"
+                  placeholder="owner/repo, GitHub/GitLab URL, or local path (e.g. /cah-sow)"
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
                 {error && (
@@ -1162,7 +1244,7 @@ IMPORTANT:
             </div>
             <p className="text-red-800 dark:text-red-300 text-sm mb-2">{error}</p>
             <p className="text-red-700 dark:text-red-300 text-xs">
-              Please check that your repository exists and is public. Valid formats are &ldquo;owner/repo&rdquo;, &ldquo;https://github.com/owner/repo&rdquo;, or &ldquo;https://gitlab.com/owner/repo&rdquo;.
+              Please check that your repository exists and is accessible. Valid formats are &ldquo;owner/repo&rdquo;, &ldquo;https://github.com/owner/repo&rdquo;, &ldquo;https://gitlab.com/owner/repo&rdquo;, or a local path like &ldquo;/cah-sow&rdquo;.
             </p>
           </div>
         ) : wikiStructure ? (
@@ -1174,22 +1256,30 @@ IMPORTANT:
 
               {/* Display repository info */}
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 flex items-center">
-                {repoInfo.type === 'github' ? (
+                {repoInfo.type === 'local' ? (
+                  <FaFolder className="mr-1" />
+                ) : repoInfo.type === 'github' ? (
                   <FaGithub className="mr-1" />
                 ) : (
                   <FaGitlab className="mr-1" />
                 )}
-                <a
-                  href={repoInfo.type === 'github'
-                    ? `https://github.com/${repoInfo.owner}/${repoInfo.repo}`
-                    : `https://gitlab.com/${repoInfo.owner}/${repoInfo.repo}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-purple-500 transition-colors"
-                >
-                  {repoInfo.owner}/{repoInfo.repo}
-                </a>
+                {repoInfo.type === 'local' ? (
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {repositoryInput.trim()} (local)
+                  </span>
+                ) : (
+                  <a
+                    href={repoInfo.type === 'github'
+                      ? `https://github.com/${repoInfo.owner}/${repoInfo.repo}`
+                      : `https://gitlab.com/${repoInfo.owner}/${repoInfo.repo}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-purple-500 transition-colors"
+                  >
+                    {repoInfo.owner}/{repoInfo.repo}
+                  </a>
+                )}
               </div>
 
               <h4 className="text-md font-semibold text-gray-800 dark:text-gray-300 mb-2">Pages</h4>
@@ -1281,7 +1371,7 @@ IMPORTANT:
             <FaWikipediaW className="text-5xl text-purple-500 mb-4" />
             <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">Welcome to DeepWiki (Open Source)</h2>
             <p className="text-gray-600 dark:text-gray-400 text-center mb-4">
-              Enter a GitHub or GitLab repository to generate a comprehensive wiki based on its structure.
+              Enter a GitHub/GitLab repository or a local path to generate a comprehensive wiki based on its structure.
             </p>
             <div className="text-gray-500 dark:text-gray-500 text-sm text-center mb-6">
               <p className="mb-2">You can enter a repository in these formats:</p>
@@ -1289,6 +1379,7 @@ IMPORTANT:
                 <li>https://github.com/AsyncFuncAI/deepwiki-open</li>
                 <li>https://github.com/openai/codex</li>
                 <li>https://gitlab.com/gitlab-org/gitlab</li>
+                <li>/cah-sow (local path mounted via Docker volume)</li>
               </ul>
             </div>
 

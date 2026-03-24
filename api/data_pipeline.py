@@ -23,6 +23,137 @@ logger = logging.getLogger(__name__)
 # Maximum token limit for OpenAI embedding models
 MAX_EMBEDDING_TOKENS = 8192
 
+
+def is_local_path(path_or_url: str) -> bool:
+    """
+    Determine if the given string is a local filesystem path (as opposed to a URL).
+
+    Args:
+        path_or_url (str): The string to check.
+
+    Returns:
+        bool: True if it looks like a local path, False if it looks like a URL.
+    """
+    path_or_url = path_or_url.strip()
+    # URLs start with http:// or https://
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        return False
+    # Absolute paths, relative paths, or home-relative paths
+    if path_or_url.startswith("/") or path_or_url.startswith("./") or path_or_url.startswith("../") or path_or_url.startswith("~"):
+        return True
+    # Also treat owner/repo style as NOT local (existing GitHub shorthand)
+    # A local path should contain a slash and look like a filesystem path
+    # If it doesn't match any URL pattern and starts with a letter but contains os.sep, treat as local
+    if os.path.isabs(path_or_url) or os.path.exists(path_or_url):
+        return True
+    return False
+
+
+def normalize_local_path(path_str: str) -> str:
+    """
+    Normalize a local path: expand ~, resolve relative paths, and return an absolute path.
+
+    Args:
+        path_str (str): The path string to normalize.
+
+    Returns:
+        str: The normalized absolute path.
+
+    Raises:
+        ValueError: If the path does not exist.
+    """
+    path_str = path_str.strip()
+    path_str = os.path.expanduser(path_str)
+    path_str = os.path.abspath(path_str)
+    if not os.path.exists(path_str):
+        raise ValueError(f"Local path does not exist: {path_str}")
+    if not os.path.isdir(path_str):
+        raise ValueError(f"Local path is not a directory: {path_str}")
+    return path_str
+
+
+def get_local_file_content(repo_path: str, file_path: str) -> str:
+    """
+    Retrieves the content of a file from a local repository directory.
+
+    Args:
+        repo_path (str): The absolute path to the local repository root.
+        file_path (str): The relative path to the file within the repository.
+
+    Returns:
+        str: The content of the file as a string.
+
+    Raises:
+        ValueError: If the file cannot be read or path traversal is detected.
+    """
+    try:
+        repo_path = os.path.abspath(repo_path)
+        full_path = os.path.normpath(os.path.join(repo_path, file_path))
+
+        # Prevent path traversal outside the repo root
+        if not full_path.startswith(repo_path):
+            raise ValueError(f"Path traversal detected: {file_path} resolves outside the repository root.")
+
+        if not os.path.exists(full_path):
+            raise ValueError(f"File not found: {file_path}")
+
+        if not os.path.isfile(full_path):
+            raise ValueError(f"Not a file: {file_path}")
+
+        with open(full_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"Failed to read local file {file_path}: {str(e)}")
+
+
+def get_local_directory_structure(local_path: str) -> str:
+    """
+    Gets the file structure of a local directory (mounted volume or local repo).
+
+    Args:
+        local_path (str): The absolute path to the local directory.
+
+    Returns:
+        str: A newline-separated list of relative file paths.
+
+    Raises:
+        ValueError: If the directory cannot be found or accessed.
+    """
+    try:
+        local_path = normalize_local_path(local_path)
+
+        # Get excluded files and directories from config
+        excluded_dirs = configs.get("file_filters", {}).get("excluded_dirs", [".venv", "node_modules"])
+        excluded_files = configs.get("file_filters", {}).get("excluded_files", ["package-lock.json"])
+
+        # Walk the directory and collect file paths
+        file_paths = []
+        for root, dirs, files in os.walk(local_path):
+            # Skip excluded directories
+            dirs[:] = [d for d in dirs if not any(excluded in os.path.join(root, d) for excluded in excluded_dirs)]
+
+            for file in files:
+                # Skip excluded files
+                if any(file == excluded for excluded in excluded_files):
+                    continue
+
+                # Get the relative path from the directory root
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, local_path)
+
+                file_paths.append(relative_path)
+
+        # Sort for consistency
+        file_paths.sort()
+
+        return "\n".join(file_paths)
+
+    except Exception as e:
+        logger.error(f"Error getting local directory structure: {e}")
+        raise ValueError(f"Failed to get local directory structure: {str(e)}")
+
 def count_tokens(text: str, model: str = "text-embedding-3-small") -> int:
     """
     Count the number of tokens in a text string using tiktoken.
@@ -436,10 +567,10 @@ def get_gitlab_file_content(repo_url: str, file_path: str, access_token: str = N
 
 def get_file_content(repo_url: str, file_path: str, access_token: str = None) -> str:
     """
-    Retrieves the content of a file from a Git repository (GitHub or GitLab).
+    Retrieves the content of a file from a Git repository (GitHub, GitLab, or local path).
 
     Args:
-        repo_url (str): The URL of the repository
+        repo_url (str): The URL of the repository or a local filesystem path
         file_path (str): The path to the file within the repository
         access_token (str, optional): Access token for private repositories
 
@@ -449,12 +580,16 @@ def get_file_content(repo_url: str, file_path: str, access_token: str = None) ->
     Raises:
         ValueError: If the file cannot be fetched or if the URL is not valid
     """
-    if "github.com" in repo_url:
+    if is_local_path(repo_url):
+        # Local repository path
+        local_path = normalize_local_path(repo_url)
+        return get_local_file_content(local_path, file_path)
+    elif "github.com" in repo_url:
         return get_github_file_content(repo_url, file_path, access_token)
     elif "gitlab.com" in repo_url:
         return get_gitlab_file_content(repo_url, file_path, access_token)
     else:
-        raise ValueError("Unsupported repository URL. Only GitHub and GitLab are supported.")
+        raise ValueError("Unsupported repository URL. Only GitHub, GitLab, and local paths are supported.")
 
 def get_local_repo_structure(repo_url: str, access_token: str = None) -> str:
     """
